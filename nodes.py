@@ -30,6 +30,7 @@ class MoondreamQuery:
             },
             "optional": {
                 "max_new_tokens": ("INT", {"default": 256}),
+                "temperature": ("FLOAT", {"min": 0.0, "max": 1.0, "step": 0.01, "default": .0},)       
             },
             }
     
@@ -38,10 +39,19 @@ class MoondreamQuery:
     FUNCTION = "process"
 
     CATEGORY = "Moondream"
+    
 
-    def process(self, images, question, keep_model_loaded, model, max_new_tokens=256):
+    def process(self, images, question, keep_model_loaded, model, max_new_tokens=256, temperature=.0):
         batch_size = images.shape[0]
         device = comfy.model_management.get_torch_device()
+        
+        #borrowed from https://github.com/Hangover3832/ComfyUI-Hangover-Moondream.git
+        if temperature < 0.01:
+            temperature = None
+            do_sample = None
+        else:
+            do_sample = True
+            
         dtype = torch.float16 if comfy.model_management.should_use_fp16() and not comfy.model_management.is_device_mps(device) else torch.float32
         
         checkpoint_path = os.path.join(script_directory, f"checkpoints/{model}")
@@ -67,7 +77,7 @@ class MoondreamQuery:
             for i in range(batch_size):
                 image = Image.fromarray(np.clip(255. * images[i].cpu().numpy(),0,255).astype(np.uint8))
                 image_embeds = self.moondream.encode_image(image)
-                answer = self.moondream.answer_question(image_embeds, question, self.tokenizer, max_new_tokens)
+                answer = self.moondream.answer_question(image_embeds, question, self.tokenizer, max_new_tokens, temperature=temperature, do_sample=do_sample)
                 answer_dict[str(i)] = answer
 
             formatted_answers = ",\n".join([f'"{frame}" : "{answer}"' for frame, answer in answer_dict.items()])
@@ -78,7 +88,7 @@ class MoondreamQuery:
         else:
             image = Image.fromarray(np.clip(255. * images[0].cpu().numpy(),0,255).astype(np.uint8))
             image_embeds = self.moondream.encode_image(image)
-            answer = self.moondream.answer_question(image_embeds, question, self.tokenizer, max_new_tokens)
+            answer = self.moondream.answer_question(image_embeds, question, self.tokenizer, max_new_tokens, temperature=temperature, do_sample=do_sample)
 
         if not keep_model_loaded:
             self.moondream = None
@@ -106,6 +116,7 @@ class MoondreamQueryCaptions:
             },
             "optional": {
                 "max_new_tokens": ("INT", {"default": 256}),
+                "temperature": ("FLOAT", {"min": 0.0, "max": 1.0, "step": 0.01, "default": .0},)      
             },
             }
     
@@ -115,9 +126,17 @@ class MoondreamQueryCaptions:
 
     CATEGORY = "Moondream"
 
-    def process(self, images, question, keep_model_loaded, model, max_new_tokens=256):
+    def process(self, images, question, keep_model_loaded, model, max_new_tokens=256, temperature=.0):
         batch_size = images.shape[0]
         device = comfy.model_management.get_torch_device()
+        
+        #borrowed from https://github.com/Hangover3832/ComfyUI-Hangover-Moondream.git
+        if temperature < 0.01:
+            temperature = None
+            do_sample = None
+        else:
+            do_sample = True
+            
         dtype = torch.float16 if comfy.model_management.should_use_fp16() and not comfy.model_management.is_device_mps(device) else torch.float32
         
         checkpoint_path = os.path.join(script_directory, f"checkpoints/{model}")
@@ -142,7 +161,7 @@ class MoondreamQueryCaptions:
         for i in range(batch_size):
             image = Image.fromarray(np.clip(255. * images[i].cpu().numpy(),0,255).astype(np.uint8))
             image_embeds = self.moondream.encode_image(image)
-            answer = self.moondream.answer_question(image_embeds, question, self.tokenizer, max_new_tokens)
+            answer = self.moondream.answer_question(image_embeds, question, self.tokenizer, max_new_tokens, temperature=temperature, do_sample=do_sample)
             answer_list.append(answer)
         for answer in answer_list:
             print(answer)
